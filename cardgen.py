@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-"""Produces SVG files for a set of cards specified in a CSV file.
+"""Produces SVG and/or PDF files for a set of cards specified in a CSV file.
 
 The CSV file should contain one card per line, where the first column is the
 number of duplicates of the card to create. Subsequent columns will be used to
