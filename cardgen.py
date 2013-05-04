@@ -15,8 +15,11 @@ python cardgen.py example_files/cards.csv example_files/template.svg
 import argparse
 import copy
 import math
+import os
 import re
+import subprocess
 import sys
+import tempfile
 import xml.etree.ElementTree as ET
 
 TEMPLATE_REGEX = '\[\[(\d+)\]\]'
@@ -44,14 +47,24 @@ def main():
   parser.add_argument('out', metavar='OUT', type=str, default='out',
                       nargs='?',
                       help='optional output filename base, defaults to out')
+  parser.add_argument('--pdf', default=False, action='store_true',
+                      help='Output a single PDF, defaults to SVG files')
   parser.add_argument('--width', type=int, default=4,
-                      help='card per page horizontally')
+                      help='cards per page horizontally')
   parser.add_argument('--height', type=int, default=2,
-                      help='card per page vertically')
+                      help='cards per page vertically')
+  parser.add_argument('--horiz-margin', type=float, default=0.5,
+                      help='horizontal margins in inches, defaults to 0.5')
+  parser.add_argument('--vert-margin', type=float, default=0.75,
+                      help='vertical margins in inches, defaults to 0.75')
+  parser.add_argument('--units-per-inch', type=int, default=90,
+                      help='number of svg units per inch, defaults to 90')
   args = parser.parse_args()
 
-  # Template regex.
+  # Constants.
   template_regex = re.compile(TEMPLATE_REGEX)
+  horiz_margin = args.units_per_inch * args.horiz_margin
+  vert_margin = args.units_per_inch * args.vert_margin
 
   # Parse cards from input CSV file.
   csv = parse_csv(args.csv)
@@ -65,12 +78,15 @@ def main():
   # Construct all pages.
   index = 0
   filenum = 0
+  output_fnames = []
   while index < len(csv):
     # New SVG DOM.
     root = ET.Element('svg', {'xmlns':'http://www.w3.org/2000/svg'})
     dom_out = ET.ElementTree(element=root)
-    root.attrib['width'] = str(template_width * int(args.width))
-    root.attrib['height'] = str(template_height * int(args.height))
+    root.attrib['width'] = str(template_width * int(args.width) +
+                               2 * horiz_margin)
+    root.attrib['height'] = str(template_height * int(args.height) +
+                                2 * vert_margin)
 
     # Construct page.
     for x in xrange(args.width):
@@ -79,23 +95,44 @@ def main():
           break
         doc_copy = copy.deepcopy(dom.getroot())
         # Set offset.
-        doc_copy.attrib['x'] = str(template_width * x)
-        doc_copy.attrib['y'] = str(template_height * y)
+        doc_copy.attrib['x'] = str(template_width * x + horiz_margin)
+        doc_copy.attrib['y'] = str(template_height * y + vert_margin)
         # Substitute templated text.
         for node in doc_copy.iter():
           if node.text:
             match = template_regex.match(node.text)
             if match:
-              node.text = csv[index][int(match.group(1))].replace('\\n', '\n')
+              repl_text = csv[index][int(match.group(1))].replace('\\n', '\n')
+              node.text = template_regex.sub(repl_text, node.text)
         root.append(doc_copy)
         index +=1
 
     # Write output SVG file for the page.
-    fname = '%s_%s.svg' % (args.out, str(filenum).zfill(digits))
-    with open(fname, 'w') as out:
-      dom_out.write(out)
+    if args.pdf:
+      with tempfile.NamedTemporaryFile(suffix='.svg', delete=False) as out:
+        dom_out.write(out)
+        output_fnames.append(out.name)
+    else:
+      fname = '%s_%s.svg' % (args.out, str(filenum).zfill(digits))
+      with open(fname, 'w') as out:
+        dom_out.write(out)
+      output_fnames.append(fname)
     filenum += 1
 
+  # Optionally generate merged PDF.
+  pdf_fnames = []
+  if args.pdf:
+    for out in output_fnames:
+      tfile = tempfile.mkstemp(suffix='.pdf')
+      os.close(tfile[0])
+      fname = '%s.pdf' % tfile[1]
+      pdf_fnames.append(fname)
+      subprocess.check_call(['inkscape', '--file=%s' % out,
+                             '--export-pdf=%s' % fname])
+    pdfunite = ['pdfunite']
+    pdfunite.extend(pdf_fnames)
+    pdfunite.append('%s.pdf' % args.out)
+    subprocess.check_call(pdfunite)
 
 
 if __name__ == '__main__':
