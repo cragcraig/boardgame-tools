@@ -45,6 +45,7 @@ def add_line(root, stroke, x1, y1, x2, y2):
       'y2': str(y2), })
   root.append(elem)
 
+
 def add_hline(root, stroke, x, y, length):
   add_line(root, stroke, x, y, x + length, y)
 
@@ -54,6 +55,7 @@ def add_vline(root, stroke, x, y, length):
 
 
 def main():
+  # Parse arguments.
   parser = argparse.ArgumentParser()
   parser.add_argument('csv', metavar='CARDS_CSV', type=str,
                       help='a csv file with one card type defined per line in '
