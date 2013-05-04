@@ -2,9 +2,14 @@
 
 """Produces SVG files for a set of cards specified in a CSV file.
 
-The CSV file should contain one card per line.
+The CSV file should contain one card per line, where the first column is the
+number of duplicates of the card to create. Subsequent columns will be used to
+generate the cards according to the template file, where any text in the
+template file matching the pattern [[N]] will be replaced by the corresponding
+Nth column of text from the csv file.
 
-Run this script with the --help option for help.
+Run this script with the --help option for help. Example usage:
+python cardgen.py example_files/cards.csv example_files/template.svg
 """
 
 import argparse
