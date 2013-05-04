@@ -23,6 +23,7 @@ import tempfile
 import xml.etree.ElementTree as ET
 
 TEMPLATE_REGEX = '\[\[(\d+)\]\]'
+GRID_FRACTION = 0.3
 
 
 def parse_csv(fname):
@@ -33,6 +34,23 @@ def parse_csv(fname):
       tmp = line.strip('\n').split(',')
       result.extend([tmp[1:]] * int(tmp[0]))
   return result
+
+
+def add_line(root, stroke, x1, y1, x2, y2):
+  elem = ET.Element('line', {
+      'style': 'stroke:rgb(150,150,150);stroke-width:%d' % stroke,
+      'x1': str(x1),
+      'y1': str(y1),
+      'x2': str(x2),
+      'y2': str(y2), })
+  root.append(elem)
+
+def add_hline(root, stroke, x, y, length):
+  add_line(root, stroke, x, y, x + length, y)
+
+
+def add_vline(root, stroke, x, y, length):
+  add_line(root, stroke, x, y, x, y + length)
 
 
 def main():
@@ -49,6 +67,8 @@ def main():
                       help='optional output filename base, defaults to out')
   parser.add_argument('--pdf', default=False, action='store_true',
                       help='Output a single PDF, defaults to SVG files')
+  parser.add_argument('--no-grid', default=False, action='store_true',
+                      help='Do not add a grid in the margins')
   parser.add_argument('--width', type=int, default=4,
                       help='cards per page horizontally')
   parser.add_argument('--height', type=int, default=2,
@@ -88,6 +108,27 @@ def main():
     root.attrib['height'] = str(template_height * int(args.height) +
                                 2 * vert_margin)
 
+    # Optionally construct grid.
+    if not args.no_grid:
+      for x in xrange(args.width + 1):
+        add_vline(root, args.units_per_inch * 0.025,
+                  x * template_width + horiz_margin,
+                  vert_margin * (1.0 - GRID_FRACTION),
+                  vert_margin * GRID_FRACTION)
+        add_vline(root, args.units_per_inch * 0.025,
+                  x * template_width + horiz_margin,
+                  args.height * template_height + vert_margin,
+                  vert_margin * GRID_FRACTION)
+      for y in xrange(args.height + 1):
+        add_hline(root, args.units_per_inch * 0.025,
+                  horiz_margin * (1.0 - GRID_FRACTION),
+                  y * template_height + vert_margin,
+                  horiz_margin * GRID_FRACTION)
+        add_hline(root, args.units_per_inch * 0.025,
+                  args.width * template_width + horiz_margin,
+                  y * template_height + vert_margin,
+                  horiz_margin * GRID_FRACTION)
+
     # Construct page.
     for x in xrange(args.width):
       for y in xrange(args.height):
@@ -122,17 +163,25 @@ def main():
   # Optionally generate merged PDF.
   pdf_fnames = []
   if args.pdf:
+    # Convert each SVG page to PDF.
     for out in output_fnames:
       tfile = tempfile.mkstemp(suffix='.pdf')
       os.close(tfile[0])
       fname = '%s.pdf' % tfile[1]
       pdf_fnames.append(fname)
-      subprocess.check_call(['inkscape', '--file=%s' % out,
-                             '--export-pdf=%s' % fname])
+      try:
+        subprocess.check_call(['inkscape', '--file=%s' % out,
+                               '--export-pdf=%s' % fname])
+      except OSError as e:
+        raise OSError('inkscape must be installed and in your path.')
+    # Merge PDF pages.
     pdfunite = ['pdfunite']
     pdfunite.extend(pdf_fnames)
     pdfunite.append('%s.pdf' % args.out)
-    subprocess.check_call(pdfunite)
+    try:
+      subprocess.check_call(pdfunite)
+    except OSError as e:
+      raise OSError('pdfunite must be installed and in your path.')
 
 
 if __name__ == '__main__':
