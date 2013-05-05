@@ -22,8 +22,8 @@ import sys
 import tempfile
 import xml.etree.ElementTree as ET
 
-TEMPLATE_REGEX = '\[\[(\d+)\]\]'
 GRID_FRACTION = 0.3
+TEMPLATE_REGEX = re.compile('\[\[(\d+)\]\]')
 
 
 def parse_csv(fname):
@@ -52,6 +52,16 @@ def add_hline(root, stroke, x, y, length):
 
 def add_vline(root, stroke, x, y, length):
   add_line(root, stroke, x, y, x, y + length)
+
+
+def apply_template(text, csv_row):
+  if not text:
+    return None
+  match = TEMPLATE_REGEX.match(text)
+  if match:
+    repl_text = csv_row[int(match.group(1))].replace('\\n', '\n')
+    return TEMPLATE_REGEX.sub(repl_text, text)
+  return None
 
 
 def main():
@@ -84,7 +94,6 @@ def main():
   args = parser.parse_args()
 
   # Constants.
-  template_regex = re.compile(TEMPLATE_REGEX)
   horiz_margin = args.units_per_inch * args.horiz_margin
   vert_margin = args.units_per_inch * args.vert_margin
 
@@ -142,11 +151,13 @@ def main():
         doc_copy.attrib['y'] = str(template_height * y + vert_margin)
         # Substitute templated text.
         for node in doc_copy.iter():
-          if node.text:
-            match = template_regex.match(node.text)
-            if match:
-              repl_text = csv[index][int(match.group(1))].replace('\\n', '\n')
-              node.text = template_regex.sub(repl_text, node.text)
+          repl_text = apply_template(node.text, csv[index])
+          if repl_text:
+            node.text = repl_text
+          for attrib, value in node.attrib.iteritems():
+            repl_text = apply_template(value, csv[index])
+            if repl_text:
+              node.attrib[attrib] = repl_text
         root.append(doc_copy)
         index +=1
 
