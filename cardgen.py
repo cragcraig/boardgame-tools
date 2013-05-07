@@ -26,12 +26,12 @@ GRID_FRACTION = 0.3
 TEMPLATE_REGEX = re.compile('\[\[(\d+)\]\]')
 
 
-def parse_csv(fname):
+def parse_csv(fname, sep=','):
   """CSV file describing the cards. First column is the card count."""
   result = []
   with open(fname, 'r') as f:
     for line in f:
-      tmp = line.strip('\n').split(',')
+      tmp = line.strip('\n').split(sep)
       result.extend([tmp[1:]] * int(tmp[0]))
   return result
 
@@ -67,14 +67,14 @@ def apply_template(text, csv_row):
 def main():
   # Parse arguments.
   parser = argparse.ArgumentParser()
-  parser.add_argument('csv', metavar='CARDS_CSV', type=str,
+  parser.add_argument('template', metavar='template_svg', type=str,
+                      help='a template SVG file, text matching [[N]] will be '
+                           'replaced by the Nth csv column.')
+  parser.add_argument('--csv', metavar='cards_csv', type=str,
                       help='a csv file with one card type defined per line in '
                            'this order: \nname, combat value, card count, '
                            'additional effects')
-  parser.add_argument('template', metavar='TEMPLATE_SVG', type=str,
-                      help='a template SVG file, text matching [[N]] will be '
-                           'replaced by the Nth csv column.')
-  parser.add_argument('out', metavar='OUT', type=str, default='out',
+  parser.add_argument('--out', metavar='out_file', type=str, default='out',
                       nargs='?',
                       help='optional output filename base, defaults to out')
   parser.add_argument('--pdf', default=False, action='store_true',
@@ -91,15 +91,21 @@ def main():
                       help='vertical margins in inches, defaults to 0.75')
   parser.add_argument('--units-per-inch', type=int, default=90,
                       help='number of svg units per inch, defaults to 90')
+  parser.add_argument('--csv-sep', default=',', type=str,
+                      help='the csv separator, defaults to \',\'')
   args = parser.parse_args()
+  if not args.csv and not args.pdf:
+    raise Exception('The arguments provided would just output the identical '
+                    'template SVG file... did you mean to use --csv or --pdf?')
 
   # Constants.
   horiz_margin = args.units_per_inch * args.horiz_margin
   vert_margin = args.units_per_inch * args.vert_margin
 
   # Parse cards from input CSV file.
-  csv = parse_csv(args.csv)
-  digits = int(math.log10(len(csv)))  # Used to pad output filename.
+  csv = parse_csv(args.csv, args.csv_sep) if args.csv else None
+  card_count = len(csv) if csv else args.width * args.height
+  digits = int(math.log10(card_count))  # Used to pad output filename.
 
   # Template file.
   dom = ET.ElementTree(file=args.template)
@@ -110,7 +116,7 @@ def main():
   index = 0
   filenum = 0
   output_fnames = []
-  while index < len(csv):
+  while index < card_count:
     # New SVG DOM.
     root = ET.Element('svg', {'xmlns':'http://www.w3.org/2000/svg'})
     dom_out = ET.ElementTree(element=root)
@@ -143,21 +149,22 @@ def main():
     # Construct page.
     for x in xrange(args.width):
       for y in xrange(args.height):
-        if index == len(csv):
+        if index == card_count:
           break
         doc_copy = copy.deepcopy(dom.getroot())
         # Set offset.
         doc_copy.attrib['x'] = str(template_width * x + horiz_margin)
         doc_copy.attrib['y'] = str(template_height * y + vert_margin)
         # Substitute templated text.
-        for node in doc_copy.iter():
-          repl_text = apply_template(node.text, csv[index])
-          if repl_text:
-            node.text = repl_text
-          for attrib, value in node.attrib.iteritems():
-            repl_text = apply_template(value, csv[index])
+        if csv:
+          for node in doc_copy.iter():
+            repl_text = apply_template(node.text, csv[index])
             if repl_text:
-              node.attrib[attrib] = repl_text
+              node.text = repl_text
+            for attrib, value in node.attrib.iteritems():
+              repl_text = apply_template(value, csv[index])
+              if repl_text:
+                node.attrib[attrib] = repl_text
         root.append(doc_copy)
         index +=1
 
@@ -178,9 +185,12 @@ def main():
   if args.pdf:
     # Convert each SVG page to PDF.
     for out in output_fnames:
-      tfile = tempfile.mkstemp(suffix='.pdf')
-      os.close(tfile[0])
-      fname = '%s.pdf' % tfile[1]
+      if len(output_fnames) > 1:
+        tfile = tempfile.mkstemp(suffix='.pdf')
+        os.close(tfile[0])
+        fname = tfile[1]
+      else:
+        fname = '%s.pdf' % args.out
       pdf_fnames.append(fname)
       try:
         subprocess.check_call(['inkscape', '--file=%s' % out,
@@ -188,13 +198,14 @@ def main():
       except OSError as e:
         raise OSError('inkscape must be installed and in your path.')
     # Merge PDF pages.
-    pdfunite = ['pdfunite']
-    pdfunite.extend(pdf_fnames)
-    pdfunite.append('%s.pdf' % args.out)
-    try:
-      subprocess.check_call(pdfunite)
-    except OSError as e:
-      raise OSError('pdfunite must be installed and in your path.')
+    if len(pdf_fnames) > 1:
+      pdfunite = ['pdfunite']
+      pdfunite.extend(pdf_fnames)
+      pdfunite.append('%s.pdf' % args.out)
+      try:
+        subprocess.check_call(pdfunite)
+      except OSError as e:
+        raise OSError('pdfunite must be installed and in your path.')
 
 
 if __name__ == '__main__':
