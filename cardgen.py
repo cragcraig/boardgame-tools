@@ -57,7 +57,7 @@ def add_vline(root, stroke, x, y, length):
 def apply_template(text, csv_row):
   if not text:
     return None
-  match = TEMPLATE_REGEX.match(text)
+  match = TEMPLATE_REGEX.search(text)
   if match:
     repl_text = csv_row[int(match.group(1))].replace('\\n', '\n')
     return TEMPLATE_REGEX.sub(repl_text, text)
