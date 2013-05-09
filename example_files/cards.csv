@@ -1,28 +1,4 @@
-3,Ambush,5,defending: may choose a rival to defend in your place
-3,Sluggish Stomach,5,discard piece of meat: +5 combat strength
-3,Peripheral Vision,6,attacking: may flip the next offensive card and add its effects
-3,Hunger,6,win attack: may attack same target again
-4,Defensive Strike,7,lose defense: rival does not take any meat
-4,Sated Stomach,7,discard piece of meat: +5 combat strength
-4,Pack Leader,8,defending: choose a rival to help you
-6,Driven by Hunger,8,win attack: +2 meat
-4,Conspirators,9,attacking: choose a rival to help you
-4,Chomp,9,lose attack: may attack same target again
-4,Rip,10,win defense: +2 meat
-3,Tear,10,attacking prey: +3 combat strength
-3,Serrated Teeth,10,discard piece of meat: +5 combat strength
-5,Leap,11,defending: +2 combat strength
-4,Lunge,11,win attack: +1 meat
-5,Shred,12,win attack: may attack same target again
-4,Reckless Lunge,12,win attack: +2 meat; lose attack against rival: rival takes +1 meat
-4,Deadly Claw,13,discard piece of meat: +5 combat strength
-4,Ravaging Hunger,13,lose attack: may attack same target again
-3,Ripping Claw,14,
-3,Temptation,14,attacking: choose a rival to help you
-3,Brutal Defense,15,win defense: +1 meat
-3,Agile Strike,15,
-4,Speedy Approach,16,win defense: +1 meat
-4,Relentless Attack,17,discard piece of meat: attack target again
-2,Stunning Blow,18,discard piece of meat: rival skips next turn
-2,Wounding Blow,19,
-2,Ripping Claw,20,win defense: +1 meat
+3,Some Title One,svg1,Some Text A
+2,Some Title Two,svg2,Some Text B
+4,Some Title Three,svg1,Some Text C
+5,Some Title Four,svg2,Some Text D

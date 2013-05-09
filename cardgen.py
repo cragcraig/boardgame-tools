@@ -1,15 +1,19 @@
 #!/usr/bin/python
 
-"""Produces SVG and/or PDF files for a set of cards specified in a CSV file.
+"""Generates SVG and/or PDF files for a set of cards specified in a CSV file.
 
 The CSV file should contain one card per line, where the first column is the
 number of duplicates of the card to create. Subsequent columns will be used to
 generate the cards according to the template file, where any text in the
-template file matching the pattern [[N]] will be replaced by the corresponding
-Nth column of text from the csv file.
+template file matching the pattern [%N] will be replaced by the corresponding
+string from the Nth column of the csv file.
+
+Any node with a label attribute of the form [path/%N.svg] will be replaced by
+the svg located at that location relative to the template file, where %N is the
+corresponding string from the Nth column of the csv file.
 
 Run this script with the --help option for help. Example usage:
-python cardgen.py example_files/cards.csv example_files/template.svg
+python cardgen.py example_files/template.svg --csv=example_files/cards.csv
 """
 
 import argparse
@@ -23,13 +27,16 @@ import tempfile
 import xml.etree.ElementTree as ET
 
 GRID_FRACTION = 0.3
-TEMPLATE_REGEX = re.compile('\[\[(\d+)\]\]')
+TEMPLATE_REGEX = re.compile('\[%(\d+)\]')  # e.g. [%1]
+SUBSVG_REGEX = re.compile('\[(.*%(\d+)\.svg)\]')  # e.g. [subdir/%1.svg]
 
 
-def parse_csv(fname, sep=','):
+def parse_csv(fname, sep=',', skip_first=False):
   """CSV file describing the cards. First column is the card count."""
   result = []
   with open(fname, 'r') as f:
+    if skip_first:
+      f = list(f)[1:]
     for line in f:
       tmp = line.strip('\n').split(sep)
       result.extend([tmp[1:]] * int(tmp[0]))
@@ -64,6 +71,39 @@ def apply_template(text, csv_row):
   return None
 
 
+def apply_subsvg(node, csv_row, template_dir):
+  fname = None
+  for attrib, value in node.attrib.iteritems():
+    if 'label' in attrib:
+      match = SUBSVG_REGEX.match(value)
+      if match:
+        fname = match.group(1).replace(
+            '%' + match.group(2), csv_row[int(match.group(2))])
+        fname = os.path.join(template_dir, fname)
+        break
+  if not fname:
+    return
+  if not os.path.isfile(fname):
+    raise OSError('Templated file \'%s\' does not exist' % fname)
+  dom = ET.ElementTree(file=fname)
+  root = dom.getroot()
+  if any(a not in node.attrib for a in ('x', 'y', 'width', 'height')):
+    raise ValueError('Sub-SVG placeholder lacks a required x, y, width, or '
+                     'height attribute')
+  new_attrib = {
+      'xmlns': 'http://www.w3.org/2000/svg',
+      'x': node.attrib['x'],
+      'y': node.attrib['y'],
+      'width': node.attrib['width'],
+      'height': node.attrib['height'],
+      'viewBox': '0 0 %s %s' % (root.attrib['width'], root.attrib['height']),
+      'preserveAspectRatio': 'xMidYMid meet'}
+  node.clear()
+  node.tag = 'svg'
+  node.attrib = new_attrib
+  node.extend(list(root))
+
+
 def main():
   # Parse arguments.
   parser = argparse.ArgumentParser()
@@ -80,7 +120,7 @@ def main():
   parser.add_argument('--pdf', default=False, action='store_true',
                       help='Output a single PDF, defaults to SVG files')
   parser.add_argument('--no-grid', default=False, action='store_true',
-                      help='Do not add a grid in the margins')
+                      help='Do not render a grid in the margins')
   parser.add_argument('--width', type=int, default=4,
                       help='cards per page horizontally')
   parser.add_argument('--height', type=int, default=2,
@@ -93,6 +133,8 @@ def main():
                       help='number of svg units per inch, defaults to 90')
   parser.add_argument('--csv-sep', default=',', type=str,
                       help='the csv separator, defaults to \',\'')
+  parser.add_argument('--csv-skip-first', default=False, action='store_true',
+                      help='discard the first line of the csv file')
   args = parser.parse_args()
   if not args.csv and not args.pdf:
     raise Exception('The arguments provided would just output the identical '
@@ -103,7 +145,10 @@ def main():
   vert_margin = args.units_per_inch * args.vert_margin
 
   # Parse cards from input CSV file.
-  csv = parse_csv(args.csv, args.csv_sep) if args.csv else None
+  if args.csv:
+    csv = parse_csv(args.csv, args.csv_sep, skip_first=args.csv_skip_first)
+  else:
+    csv = None
   card_count = len(csv) if csv else args.width * args.height
   digits = int(math.log10(card_count))  # Used to pad output filename.
 
@@ -111,6 +156,7 @@ def main():
   dom = ET.ElementTree(file=args.template)
   template_width = int(dom.getroot().attrib['width'])
   template_height = int(dom.getroot().attrib['height'])
+  template_dir = os.path.abspath(os.path.dirname(args.template))
 
   # Construct all pages.
   index = 0
@@ -118,7 +164,7 @@ def main():
   output_fnames = []
   while index < card_count:
     # New SVG DOM.
-    root = ET.Element('svg', {'xmlns':'http://www.w3.org/2000/svg'})
+    root = ET.Element('svg', {'xmlns': 'http://www.w3.org/2000/svg'})
     dom_out = ET.ElementTree(element=root)
     root.attrib['width'] = str(template_width * int(args.width) +
                                2 * horiz_margin)
@@ -155,8 +201,12 @@ def main():
         # Set offset.
         doc_copy.attrib['x'] = str(template_width * x + horiz_margin)
         doc_copy.attrib['y'] = str(template_height * y + vert_margin)
-        # Substitute templated text.
         if csv:
+          # Substitute templated sub-svg.
+          for node in doc_copy.iter():
+            apply_subsvg(node, csv[index], template_dir)
+
+          # Substitute templated text.
           for node in doc_copy.iter():
             repl_text = apply_template(node.text, csv[index])
             if repl_text:
