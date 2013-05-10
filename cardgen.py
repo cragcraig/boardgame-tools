@@ -82,7 +82,7 @@ def apply_subsvg(node, csv_row, template_dir):
         fname = os.path.join(template_dir, fname)
         break
   if not fname:
-    return
+    return False
   if not os.path.isfile(fname):
     raise OSError('Templated file \'%s\' does not exist' % fname)
   dom = ET.ElementTree(file=fname)
@@ -102,6 +102,7 @@ def apply_subsvg(node, csv_row, template_dir):
   node.tag = 'svg'
   node.attrib = new_attrib
   node.extend(list(root))
+  return True
 
 
 def main():
@@ -208,19 +209,22 @@ def main():
         doc_copy.attrib['x'] = str(template_width * x + horiz_margin)
         doc_copy.attrib['y'] = str(template_height * y + vert_margin)
         if csv:
-          # Substitute templated sub-svg.
-          for node in doc_copy.iter():
-            apply_subsvg(node, csv[index], template_dir)
-
-          # Substitute templated text.
-          for node in doc_copy.iter():
-            repl_text = apply_template(node.text, csv[index])
-            if repl_text:
-              node.text = repl_text
-            for attrib, value in node.attrib.iteritems():
-              repl_text = apply_template(value, csv[index])
+          # Substitute templates.
+          templating_complete = False
+          while not templating_complete:  # Support recursive templating.
+            templating_complete = True
+            for node in doc_copy.iter():
+              if apply_subsvg(node, csv[index], template_dir):
+                templating_complete = False
+              repl_text = apply_template(node.text, csv[index])
               if repl_text:
-                node.attrib[attrib] = repl_text
+                node.text = repl_text
+                templating_complete = False
+              for attrib, value in node.attrib.iteritems():
+                repl_text = apply_template(value, csv[index])
+                if repl_text:
+                  node.attrib[attrib] = repl_text
+                  templating_complete = False
         root.append(doc_copy)
         index +=1
 
@@ -240,6 +244,7 @@ def main():
   pdf_fnames = []
   if args.pdf:
     # Convert each SVG page to PDF.
+    # TODO(craig): Do these in parallel.
     for out in output_fnames:
       if args.verbose:
         print 'SVG -> PDF (%d)' % (len(pdf_fnames) + 1)
