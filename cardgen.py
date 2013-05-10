@@ -164,12 +164,10 @@ def main():
   # Construct all pages.
   index = 0
   filenum = 0
-  page = 0
   output_fnames = []
   while index < card_count:
-    page += 1
     if args.verbose:
-      print 'Templating SVG page (%d)' % page
+      print 'Templating SVG page (%d)' % (len(output_fnames) + 1)
     # New SVG DOM.
     root = ET.Element('svg', {'xmlns': 'http://www.w3.org/2000/svg'})
     dom_out = ET.ElementTree(element=root)
