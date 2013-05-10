@@ -135,6 +135,8 @@ def main():
                       help='the csv separator, defaults to \',\'')
   parser.add_argument('--csv-skip-first', default=False, action='store_true',
                       help='discard the first line of the csv file')
+  parser.add_argument('-v', '--verbose', default=False, action='store_true',
+                      help='print status')
   args = parser.parse_args()
   if not args.csv and not args.pdf:
     raise Exception('The arguments provided would just output the identical '
@@ -161,8 +163,12 @@ def main():
   # Construct all pages.
   index = 0
   filenum = 0
+  page = 0
   output_fnames = []
   while index < card_count:
+    page += 1
+    if args.verbose:
+      print 'Templating SVG page (%d)' % page
     # New SVG DOM.
     root = ET.Element('svg', {'xmlns': 'http://www.w3.org/2000/svg'})
     dom_out = ET.ElementTree(element=root)
@@ -235,6 +241,8 @@ def main():
   if args.pdf:
     # Convert each SVG page to PDF.
     for out in output_fnames:
+      if args.verbose:
+        print 'SVG -> PDF (%d)' % (len(pdf_fnames) + 1)
       if len(output_fnames) > 1:
         tfile = tempfile.mkstemp(suffix='.pdf')
         os.close(tfile[0])
@@ -249,6 +257,8 @@ def main():
         raise OSError('inkscape must be installed and in your path.')
     # Merge PDF pages.
     if len(pdf_fnames) > 1:
+      if args.verbose:
+        print 'Merging individual PDF pages...'
       pdfunite = ['pdfunite']
       pdfunite.extend(pdf_fnames)
       pdfunite.append('%s.pdf' % args.out)
@@ -256,6 +266,8 @@ def main():
         subprocess.check_call(pdfunite)
       except OSError as e:
         raise OSError('pdfunite must be installed and in your path.')
+    if args.verbose:
+      print 'Done.'
 
 
 if __name__ == '__main__':
