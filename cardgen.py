@@ -19,11 +19,13 @@ python cardgen.py example_files/template.svg --csv=example_files/cards.csv
 import argparse
 import copy
 import math
+import multiprocessing
 import os
 import re
 import subprocess
 import sys
 import tempfile
+import time
 import xml.etree.ElementTree as ET
 
 GRID_FRACTION = 0.3
@@ -103,6 +105,56 @@ def apply_subsvg(node, csv_row, template_dir):
   node.attrib = new_attrib
   node.extend(list(root))
   return True
+
+
+def svgs_to_pdfs(svg_fnames, out_base, verbose=False):
+  """Convert each SVG page to PDF in parallel."""
+  pdf_fnames = []
+  processes = []
+  for out in svg_fnames:
+    if verbose:
+      print 'SVG -> PDF (%d)' % (len(pdf_fnames) + 1)
+    if len(svg_fnames) > 1:
+      tfile = tempfile.mkstemp(suffix='.pdf')
+      os.close(tfile[0])
+      fname = tfile[1]
+    else:
+      fname = '%s.pdf' % out_base
+    pdf_fnames.append(fname)
+    try:
+      proc = subprocess.Popen(['inkscape', '--file=%s' % out,
+                               '--export-pdf=%s' % fname])
+      processes.append(proc)
+    except OSError as e:
+      raise OSError('inkscape must be installed and in your path.')
+    # Keep processes under CPU count.
+    while len(processes) >= multiprocessing.cpu_count():
+      for proc in processes:
+        proc.poll()
+        if proc.returncode is not None:
+          processes.remove(proc)
+          if proc.returncode:
+            raise Exception('SVG -> PDF conversion failed')
+      time.sleep(0.01)
+  for proc in processes:
+    proc.wait()
+    if proc.returncode:
+      raise Exception('SVG -> PDF conversion failed')
+  return pdf_fnames
+
+
+def merge_pdfs(pdf_fnames, out_base, verbose=False):
+  """Merge pdfs."""
+  if len(pdf_fnames) > 1:
+    if verbose:
+      print 'Merging individual PDF pages...'
+    pdfunite = ['pdfunite']
+    pdfunite.extend(pdf_fnames)
+    pdfunite.append('%s.pdf' % out_base)
+    try:
+      subprocess.check_call(pdfunite)
+    except OSError as e:
+      raise OSError('pdfunite must be installed and in your path.')
 
 
 def main():
@@ -239,36 +291,9 @@ def main():
     filenum += 1
 
   # Optionally generate merged PDF.
-  pdf_fnames = []
   if args.pdf:
-    # Convert each SVG page to PDF.
-    # TODO(craig): Do these in parallel.
-    for out in output_fnames:
-      if args.verbose:
-        print 'SVG -> PDF (%d)' % (len(pdf_fnames) + 1)
-      if len(output_fnames) > 1:
-        tfile = tempfile.mkstemp(suffix='.pdf')
-        os.close(tfile[0])
-        fname = tfile[1]
-      else:
-        fname = '%s.pdf' % args.out
-      pdf_fnames.append(fname)
-      try:
-        subprocess.check_call(['inkscape', '--file=%s' % out,
-                               '--export-pdf=%s' % fname])
-      except OSError as e:
-        raise OSError('inkscape must be installed and in your path.')
-    # Merge PDF pages.
-    if len(pdf_fnames) > 1:
-      if args.verbose:
-        print 'Merging individual PDF pages...'
-      pdfunite = ['pdfunite']
-      pdfunite.extend(pdf_fnames)
-      pdfunite.append('%s.pdf' % args.out)
-      try:
-        subprocess.check_call(pdfunite)
-      except OSError as e:
-        raise OSError('pdfunite must be installed and in your path.')
+    pdf_fnames = svgs_to_pdfs(output_fnames, args.out, args.verbose)
+    merge_pdfs(pdf_fnames, args.out, args.verbose)
     if args.verbose:
       print 'Done.'
 
