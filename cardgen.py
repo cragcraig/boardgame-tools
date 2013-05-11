@@ -25,6 +25,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import xml.etree.ElementTree as ET
 
@@ -111,9 +112,8 @@ def svgs_to_pdfs(svg_fnames, out_base, verbose=False):
   """Convert each SVG page to PDF in parallel."""
   pdf_fnames = []
   processes = []
+  proc_args = []
   for out in svg_fnames:
-    if verbose:
-      print 'SVG -> PDF (%d)' % (len(pdf_fnames) + 1)
     if len(svg_fnames) > 1:
       tfile = tempfile.mkstemp(suffix='.pdf')
       os.close(tfile[0])
@@ -122,24 +122,37 @@ def svgs_to_pdfs(svg_fnames, out_base, verbose=False):
       fname = '%s.pdf' % out_base
     pdf_fnames.append(fname)
     try:
-      proc = subprocess.Popen(['inkscape', '--file=%s' % out,
-                               '--export-pdf=%s' % fname])
-      processes.append(proc)
+      proc_args.append(['inkscape', '--file=%s' % out,
+                        '--export-pdf=%s' % fname])
     except OSError as e:
       raise OSError('inkscape must be installed and in your path.')
-    # Keep processes under CPU count.
-    while len(processes) >= multiprocessing.cpu_count():
-      for proc in processes:
-        proc.poll()
-        if proc.returncode is not None:
-          processes.remove(proc)
-          if proc.returncode:
-            raise Exception('SVG -> PDF conversion failed')
-      time.sleep(0.01)
-  for proc in processes:
-    proc.wait()
-    if proc.returncode:
-      raise Exception('SVG -> PDF conversion failed')
+
+  errors = []
+  def conv():
+    while proc_args:
+      try:
+        args = proc_args.pop(0)
+      except IndexError:
+        pass
+      if verbose:
+        print 'SVG -> PDF (%d)' % (len(pdf_fnames) - len(proc_args))
+      try:
+        subprocess.check_call(args)
+      except:
+        errors.append(sys.exc_info())
+
+  # Limit conversion processes to CPU count.
+  if verbose:
+    print 'Converting pages from SVG -> PDF in parallel...'
+  threads = []
+  for _ in xrange(multiprocessing.cpu_count()):
+    thread = threading.Thread(target=conv)
+    thread.start()
+    threads.append(thread)
+  for thread in threads:
+    thread.join()
+  for error in errors:
+    raise error[0], error[1], error[2]
   return pdf_fnames
 
 
