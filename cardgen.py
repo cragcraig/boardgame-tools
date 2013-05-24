@@ -129,7 +129,7 @@ def svgs_to_pdfs(svg_fnames, out_base, verbose=False):
 
   errors = []
   def conv():
-    while proc_args:
+    while proc_args and len(errors) == 0:
       try:
         args = proc_args.pop(0)
       except IndexError:
@@ -143,7 +143,7 @@ def svgs_to_pdfs(svg_fnames, out_base, verbose=False):
 
   # Limit conversion processes to CPU count.
   if verbose:
-    print 'Converting pages from SVG -> PDF in parallel...'
+    print 'Converting individual pages to temporary PDFs...'
   threads = []
   for _ in xrange(multiprocessing.cpu_count()):
     thread = threading.Thread(target=conv)
@@ -201,6 +201,8 @@ def main():
                       help='the csv separator, defaults to \',\'')
   parser.add_argument('--csv-skip-first', default=False, action='store_true',
                       help='discard the first line of the csv file')
+  parser.add_argument('--pages', type=int, default=0,
+                      help='if provided, limit the number of pages')
   parser.add_argument('-v', '--verbose', default=False, action='store_true',
                       help='print status')
   args = parser.parse_args()
@@ -230,7 +232,8 @@ def main():
   index = 0
   filenum = 0
   output_fnames = []
-  while index < card_count:
+  while (index < card_count and
+      (not args.pages or len(output_fnames) < args.pages)):
     if args.verbose:
       print 'Templating SVG page (%d)' % (len(output_fnames) + 1)
     # New SVG DOM.
