@@ -175,7 +175,7 @@ def main():
   parser = argparse.ArgumentParser()
   parser.add_argument('template', metavar='template_svg', type=str,
                       help='a template SVG file, text matching [[N]] will be '
-                           'replaced by the Nth csv column.')
+                           'replaced by the Nth csv column')
   parser.add_argument('--csv', metavar='cards_csv', type=str,
                       help='a csv file with one card type defined per line in '
                            'this order: \nname, combat value, card count, '
@@ -184,7 +184,7 @@ def main():
                       nargs='?',
                       help='optional output filename base, defaults to out')
   parser.add_argument('--pdf', default=False, action='store_true',
-                      help='Output a single PDF, defaults to SVG files')
+                      help='output a single PDF file, defaults to SVG files')
   parser.add_argument('--no-grid', default=False, action='store_true',
                       help='Do not render a grid in the margins')
   parser.add_argument('--width', type=int, default=4,
