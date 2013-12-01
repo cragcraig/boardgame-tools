@@ -143,7 +143,7 @@ def svgs_to_pdfs(svg_fnames, out_base, verbose=False):
 
   # Limit conversion processes to CPU count.
   if verbose:
-    print 'Converting individual pages to temporary PDFs...'
+    print 'Converting individual pages to PDFs...'
   threads = []
   for _ in xrange(multiprocessing.cpu_count()):
     thread = threading.Thread(target=conv)
