@@ -16,6 +16,8 @@ Run this script with the --help option for help. Example usage:
 python cardgen.py example_files/template.svg --csv=example_files/cards.csv
 """
 
+from __future__ import print_function
+
 import argparse
 import copy
 import math
@@ -32,6 +34,8 @@ import xml.etree.ElementTree as ET
 GRID_FRACTION = 0.3
 TEMPLATE_REGEX = re.compile('\[%(\d+)\]')  # e.g. [%1]
 SUBSVG_REGEX = re.compile('\[(.*%(\d+)\.svg)\]')  # e.g. [subdir/%1.svg]
+
+_GLOBAL_PRINT_LOCK = threading.Lock()
 
 
 def parse_csv(fname, sep=',', skip_first=False):
@@ -62,6 +66,11 @@ def add_hline(root, stroke, x, y, length):
 
 def add_vline(root, stroke, x, y, length):
   add_line(root, stroke, x, y, x, y + length)
+
+
+def _synchronized_print(*args, **kwargs):
+    with _GLOBAL_PRINT_LOCK:
+        print(*args, **kwargs)
 
 
 def apply_template(text, csv_row):
@@ -135,7 +144,8 @@ def svgs_to_pdfs(svg_fnames, out_base, verbose=False):
       except IndexError:
         pass
       if verbose:
-        print 'SVG -> PDF (%d)' % (len(pdf_fnames) - len(proc_args))
+        _synchronized_print(
+            'SVG -> PDF (%d)' % (len(pdf_fnames) - len(proc_args)))
       try:
         subprocess.check_call(args)
       except:
@@ -143,7 +153,7 @@ def svgs_to_pdfs(svg_fnames, out_base, verbose=False):
 
   # Limit conversion processes to CPU count.
   if verbose:
-    print 'Converting individual pages to PDFs...'
+    print('Converting individual pages to PDFs...')
   threads = []
   for _ in xrange(multiprocessing.cpu_count()):
     thread = threading.Thread(target=conv)
@@ -160,7 +170,7 @@ def merge_pdfs(pdf_fnames, out_base, verbose=False):
   """Merge pdfs."""
   if len(pdf_fnames) > 1:
     if verbose:
-      print 'Merging individual PDF pages...'
+      print('Merging individual PDF pages...')
     pdfunite = ['pdfunite']
     pdfunite.extend(pdf_fnames)
     pdfunite.append('%s.pdf' % out_base)
@@ -235,7 +245,7 @@ def main():
   while (index < card_count and
       (not args.pages or len(output_fnames) < args.pages)):
     if args.verbose:
-      print 'Templating SVG page (%d)' % (len(output_fnames) + 1)
+      print('Templating SVG page (%d)' % (len(output_fnames) + 1))
     # New SVG DOM.
     root = ET.Element('svg', {'xmlns': 'http://www.w3.org/2000/svg'})
     dom_out = ET.ElementTree(element=root)
@@ -283,12 +293,12 @@ def main():
               if apply_subsvg(node, csv[index], template_dir):
                 templating_complete = False
               repl_text = apply_template(node.text, csv[index])
-              if repl_text:
+              if repl_text is not None:
                 node.text = repl_text
                 templating_complete = False
               for attrib, value in node.attrib.iteritems():
                 repl_text = apply_template(value, csv[index])
-                if repl_text:
+                if repl_text is not None:
                   node.attrib[attrib] = repl_text
                   templating_complete = False
         root.append(doc_copy)
@@ -311,7 +321,7 @@ def main():
     pdf_fnames = svgs_to_pdfs(output_fnames, args.out, args.verbose)
     merge_pdfs(pdf_fnames, args.out, args.verbose)
     if args.verbose:
-      print 'Done.'
+      print('Done.')
 
 
 if __name__ == '__main__':
