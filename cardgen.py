@@ -6,7 +6,8 @@ The CSV file should contain one card per line, where the first column is the
 number of duplicates of the card to create. Subsequent columns will be used to
 generate the cards according to the template file, where any text in the
 template file matching the pattern [%N] will be replaced by the corresponding
-string from the Nth column of the csv file.
+string from the Nth column of the csv file. Any literal \n will be replaced by
+a newline.
 
 Any node with a label attribute of the form [path/%N.svg] will be replaced by
 the svg located at that location relative to the template file, where %N is the
@@ -130,11 +131,7 @@ def svgs_to_pdfs(svg_fnames, out_base, verbose=False):
     else:
       fname = '%s.pdf' % out_base
     pdf_fnames.append(fname)
-    try:
-      proc_args.append(['inkscape', '--file=%s' % out,
-                        '--export-pdf=%s' % fname])
-    except OSError as e:
-      raise OSError('inkscape must be installed and in your path.')
+    proc_args.append(['inkscape', '--file=%s' % out, '--export-pdf=%s' % fname])
 
   errors = []
   def conv():
