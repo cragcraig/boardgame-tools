@@ -14,7 +14,7 @@ the svg located at that location relative to the template file, where %N is the
 corresponding string from the Nth column of the csv file.
 
 Run this script with the --help option for help. Example usage:
-python cardgen.py example_files/template.svg --csv=example_files/cards.csv
+python card_templater.py example_files/template.svg --csv=example_files/cards.csv
 """
 
 from __future__ import print_function
