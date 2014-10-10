@@ -70,8 +70,8 @@ def add_vline(root, stroke, x, y, length):
 
 
 def _synchronized_print(*args, **kwargs):
-    with _GLOBAL_PRINT_LOCK:
-        print(*args, **kwargs)
+  with _GLOBAL_PRINT_LOCK:
+    print(*args, **kwargs)
 
 
 def apply_template(text, csv_row):
@@ -167,7 +167,7 @@ def merge_pdfs(pdf_fnames, out_base, verbose=False):
   """Merge pdfs."""
   if len(pdf_fnames) > 1:
     if verbose:
-      print('Merging individual PDF pages...')
+      print('Merging individual PDF files...')
     pdfunite = ['pdfunite']
     pdfunite.extend(pdf_fnames)
     pdfunite.append('%s.pdf' % out_base)
