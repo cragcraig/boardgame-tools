@@ -32,8 +32,9 @@ def main():
   print '  n: value'
   print '---:--------'
   for x, v in dist.iteritems():
-    print ('%s: %0.2f' % (str(x).rjust(3), v) +
-           (' <--' if x == args.mean and args.mark else ''))
+    if not args.integers or ('%0.2f' % v) != '0.00':
+      print ('%s: %0.2f' % (str(x).rjust(3), v) +
+             (' <--' if x == args.mean and args.mark else ''))
   print 'Actual discrete integral: %0.2f' % sum(dist.itervalues())
 
 if __name__ == '__main__':
