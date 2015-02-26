@@ -318,7 +318,7 @@ def main():
     pdf_fnames = svgs_to_pdfs(output_fnames, args.out, args.verbose)
     merge_pdfs(pdf_fnames, args.out, args.verbose)
     if args.verbose:
-      print('Done.')
+      print('Final merged file: %s.pdf\nDone.' % args.out)
 
 
 if __name__ == '__main__':
